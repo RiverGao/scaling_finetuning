@@ -1,4 +1,4 @@
-for residue in True
+for residue in True False
 do
   echo residue: $residue
   echo size div
