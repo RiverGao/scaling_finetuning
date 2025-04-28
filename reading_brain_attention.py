@@ -8,7 +8,7 @@ import os
 
 
 model_path = '[path-to-your-model]'
-model_name = model_path.split('/')[-1]  # gpt-2, llama, gemma, mistral, phi-3
+model_name = model_path.split('/')[-1]  # llama, gemma, mistral, phi-3
 save_dir = f'path-to-save/{model_name}'
 if not os.path.exists(save_dir): 
     os.mkdir(save_dir)
