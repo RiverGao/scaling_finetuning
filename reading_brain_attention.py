@@ -1,24 +1,32 @@
 import torch
-from transformers import LlamaTokenizer, LlamaModel
+from transformers import AutoTokenizer, AutoModel, AutoModelForCausalLM
 import numpy as np
 from torch.nn import functional as F
 import pdb
 import sys
+import os
 
-model_size = sys.argv[1]
-model_path = f'/home/gaocj/llama-test/hf-ckpt/{model_size}'
-# model_path = 'decapoda-research/llama-13b-hf'
-p = eval(sys.argv[2])
-has_instruction = True
 
-# instruction = 'Please translate sentence into German:'
-# prefix = 'instr_' if has_instruction else ''
+model_path = '[path-to-your-model]'
+model_name = model_path.split('/')[-1]  # gpt-2, llama, gemma, mistral, phi-3
+save_dir = f'path-to-save/{model_name}'
+if not os.path.exists(save_dir): 
+    os.mkdir(save_dir)
+has_instruction = False
+
+
+token_begin = "Ġ" if model_name in ["phi-2", "phi-3-small", "Llama-3-8B", "Llama-3-8B-Instruct", "Llama-3-70B", "Llama-3-70B-Instruct"] else "▁"
+has_bos = False if model_name in ["phi-2", "phi-3-small"] else True
+
+
+instruction = 'Please translate sentence into German:'
+prefix = 'instr_' if has_instruction else ''
 
 # instruction = 'Please paraphrase this sentence:'
 # prefix = 'para_' if has_instruction else ''
 
-instruction = 'Cigarette first steel convenience champion.'
-prefix = 'ctrl_' if has_instruction else ''
+# instruction = 'Cigarette first steel convenience champion.'
+# prefix = 'ctrl_' if has_instruction else ''
 
 
 def token_groups(words, tokens):
@@ -58,7 +66,7 @@ def merge_attentions(attn_mat, tok_groups):
 
 
 # read sentences
-with open(f'text/reading_brain/sentences_p{p}.txt', 'r') as f:
+with open(f'[data-path]/reading_brain_sentences.txt', 'r') as f:
     articles = f.read().strip().split('\n\n')
 
 article_sentences = []  # List[List[str]]
@@ -77,12 +85,21 @@ max_n_sents = max(n_sents)  # max number of sentences in all articles
 max_sent_len = max(n_words)  # max number of words in all sentences
 
 # model initialization
-tokenizer = LlamaTokenizer.from_pretrained(model_path)
-model = LlamaModel.from_pretrained(
+
+tokenizer = AutoTokenizer.from_pretrained(model_path, trust_remote_code=True)
+
+model = AutoModelForCausalLM.from_pretrained(  # model initialization for phi-3 only
     model_path, 
     device_map= "auto", 
-    load_in_8bit=False)
-# model.to('cuda')
+    load_in_8bit=False,
+    trust_remote_code=True)
+
+# model = AutoModel.from_pretrained(  # model initialization for other models
+#     model_path, 
+#     device_map= "auto", 
+#     load_in_8bit=False,
+#     trust_remote_code=True)
+
 model.eval()
 
 n_layer = model.config.num_hidden_layers
@@ -100,10 +117,11 @@ for article in article_sentences:
     # iterate over sentences
     attention_per_sentence = [[] for j in range(n_layer)]  # n_layer * n_sent * (n_head, max_sent_len, max_sent_len)
     for sentence in article:
+        # breakpoint()
         s_words = sentence.split()
         print(tokenizer.tokenize(sentence))
         # assert 0
-        s_tokens = [x.replace('▁', '') for x in tokenizer.tokenize(sentence)]
+        s_tokens = [x.replace(token_begin, '') for x in tokenizer.tokenize(sentence)]
         print(s_words)
         s_groups = token_groups(s_words, s_tokens)
         print(s_groups)
@@ -127,9 +145,9 @@ for article in article_sentences:
             print(attn_tensor.size())
 
             if not has_instruction:
-                attn_array = attn_tensor.numpy()[:, 1:, 1:]  # do not average attention heads
+                attn_array = attn_tensor.numpy()[:, 1:, 1:] if has_bos else attn_tensor.numpy()  # do not average attention heads
             else:
-                attn_array = attn_tensor.numpy()[:, len_instruct + 1:, len_instruct + 1:]
+                attn_array = attn_tensor.numpy()[:, len_instruct + 1:, len_instruct + 1:] if has_bos else attn_tensor.numpy()[:, len_instruct:, len_instruct:]
 
             print(attn_array.shape)
             list_head_attn = []
@@ -162,4 +180,4 @@ for lyr in range(n_layer):
     stacked_tensors = torch.stack(tensors_to_stack)  # (n_arti, max_n_sents, n_head, max_sent_len, max_sent_len)
     stacked_np = stacked_tensors.numpy()
     print(f'All final shape: {stacked_np.shape}')
-    np.save(f'attentions/reading_brain/{model_size}/p{p}/{prefix}rb_p{p}_layer{lyr}.npy', stacked_np)
+    np.save(f'{save_dir}/{prefix}rb_layer{lyr}.npy', stacked_np)
