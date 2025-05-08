@@ -95,9 +95,9 @@ def process_vertex(v,X_train,X_test,events,surf,words):
       scan -= 1
      fmri_snt[row,col] = surf[article-1][v,scan]
    if sid <133:
-				y_train.extend(fmri_snt[tril_idx[0],tril_idx[1]])
+	   y_train.extend(fmri_snt[tril_idx[0],tril_idx[1]])
    else:
-			 y_test.extend(fmri_snt[tril_idx[0],tril_idx[1]])
+	   y_test.extend(fmri_snt[tril_idx[0],tril_idx[1]])
  y_train = np.array(y_train)
  y_test = np.array(y_test)
  model_train = RidgeCV(alphas=[0.1,1.0,10.0]).fit(X_train.T,y_train)
