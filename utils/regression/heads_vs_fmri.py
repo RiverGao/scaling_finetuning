@@ -100,7 +100,7 @@ def process_vertex(v,X_train,X_test,events,surf,words):
 	   y_test.extend(fmri_snt[tril_idx[0],tril_idx[1]])
  y_train = np.array(y_train)
  y_test = np.array(y_test)
- model_train = RidgeCV(alphas=[0.1,1.0,10.0]).fit(X_train.T,y_train)
+ model_train = RidgeCV(alphas=np.logspace(1,3,20)).fit(X_train.T,y_train)
  y_predict = X_test.T @ model_train.coef_
  corr[v],_ = pearsonr(y_predict,y_test)
  corr[v] = np.nan_to_num(corr[v])
